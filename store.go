@@ -72,6 +72,10 @@ func (s *Store) getAbsolutePath(path string) string {
     return fmt.Sprintf("%s/%s", s.Root, path)
 }
 
+func (s *Store) Clear() error {
+    return os.RemoveAll(s.Root)
+}
+
 func (s *Store) Has(key string) bool {
     pathKey := s.PathTransformFunc(key)
     _, err := os.Stat(s.getAbsolutePath(pathKey.GetFilePath()))

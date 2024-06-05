@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
+	"time"
 )
 
 func TestPathTransformFunc(t *testing.T) {
@@ -20,65 +22,74 @@ func TestPathTransformFunc(t *testing.T) {
 }
 
 func TestDeleteStoreKey(t *testing.T) {
-    opts := StoreOpts{
-        Root: "./storage",
-        PathTransformFunc: CASPathTransformFunc,        
-    }
+    store := newStore(t)
+    defer teardown(t, store)
 
-    store, err := NewStore(opts)
-    if err != nil {
-        t.Error(err)
-    }
-    key := "randomKey101"
-    data := []byte("hey its me random bytes")
-    if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
-        t.Error(err)
-    }
+    for i:=0; i < 50; i++ {
+        key := fmt.Sprintf("foo_%d", i)
+        data := []byte("some random bytes")
+        if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
+            t.Error(err)
+        }
 
-    if err := store.Delete(key); err != nil {
-        t.Error(err)
-    }
+        if err := store.Delete(key); err != nil {
+            t.Error(err)
+        }
 
-    if store.Has(key) {
-        t.Errorf("not expecting the key %s", key)
+        if store.Has(key) {
+            t.Errorf("not expecting the key %s", key)
+        }
     }
 }
 
 func TestStore(t *testing.T) {
+    store := newStore(t)
+    defer teardown(t, store)
+
+    for i:=0; i < 50; i++ {
+        key := fmt.Sprintf("foo_%d", i)
+        data := []byte("some random bytes")
+        if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
+            t.Error(err)
+        }
+
+        if !store.Has(key) {
+            t.Errorf("expected to have key %s", key)
+        }
+
+        r, err := store.Read(key)
+        if err != nil {
+            t.Error(err)
+        }
+
+        b, err := io.ReadAll(r)
+        if err != nil {
+            t.Error(err)
+        }
+
+        if string(b) != string(data) {
+            t.Errorf("want \"%s\" have \"%s\"", data, b)
+        }
+
+        store.Delete(key)
+    }
+}
+
+func newStore(t *testing.T) *Store {
     opts := StoreOpts{
-        Root: "./storage",
+        Root: fmt.Sprintf("./storage/%d", time.Now().UnixMilli()),
         PathTransformFunc: CASPathTransformFunc,        
     }
-
     store, err := NewStore(opts)
     if err != nil {
         t.Error(err)
     }
-    key := "randomKey"
-    data := []byte("hey its me chirag")
-    if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
-        t.Error(err)
-    }
-
-    if !store.Has(key) {
-        t.Errorf("expected to have key %s", key)
-    }
-
-    r, err := store.Read(key)
-    if err != nil {
-        t.Error(err)
-    }
-
-    b, err := io.ReadAll(r)
-    if err != nil {
-        t.Error(err)
-    }
-    
-    if string(b) != string(data) {
-        t.Errorf("want \"%s\" have \"%s\"", data, b)
-    }
-
-    store.Delete(key)
+    return store
 }
 
+func teardown(t *testing.T, s *Store) {
+    if err := s.Clear(); err != nil {
+        t.Error(err)
+    }
+}
 

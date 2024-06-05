@@ -119,6 +119,10 @@ func (s *Store) Read(key string) (io.Reader, error) {
         f.Close()
     }()
 
+    // To-Do 
+    // Here we are copying the whole file into a buffer
+    // which will not work well with big files so we need to 
+    // find a better way to do this
     buf := new(bytes.Buffer)
     _, err = io.Copy(buf, f)
     if err != nil {

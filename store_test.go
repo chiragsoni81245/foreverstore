@@ -21,27 +21,6 @@ func TestPathTransformFunc(t *testing.T) {
     }
 }
 
-func TestDeleteStoreKey(t *testing.T) {
-    store := newStore(t)
-    defer teardown(t, store)
-
-    for i:=0; i < 50; i++ {
-        key := fmt.Sprintf("foo_%d", i)
-        data := []byte("some random bytes")
-        if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
-            t.Error(err)
-        }
-
-        if err := store.Delete(key); err != nil {
-            t.Error(err)
-        }
-
-        if store.Has(key) {
-            t.Errorf("not expecting the key %s", key)
-        }
-    }
-}
-
 func TestStore(t *testing.T) {
     store := newStore(t)
     defer teardown(t, store)
@@ -73,6 +52,10 @@ func TestStore(t *testing.T) {
 
         if err := store.Delete(key); err != nil {
             t.Error(err)
+        }
+
+        if store.Has(key) {
+            t.Errorf("not expecting the key %s", key)
         }
     }
 }

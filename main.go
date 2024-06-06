@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"time"
 
 	"github.com/chiragsoni81245/foreverstore/p2p"
 )
@@ -30,10 +30,12 @@ func main(){
     }
 
     fs := NewFileServer(fileServerOpts)
-    if err := fs.Start(); err != nil {
-        log.Fatal(err)
-    }
 
-    select {}
+    go func() {
+        time.Sleep(time.Second * 13)
+        fs.Stop()
+    }()
+
+    fs.Start()
 }
 

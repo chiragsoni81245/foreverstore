@@ -132,6 +132,10 @@ func (s *Store) Read(key string) (io.Reader, error) {
     return buf, nil
 }
 
+func (s *Store) Write(key string, r io.Reader) error {
+    return s.writeStream(key, r)
+}
+
 func (s *Store) readStream(key string) (*os.File, error) {
     pathKey := s.PathTransformFunc(key)
     return os.Open(s.getAbsolutePath(pathKey.GetFilePath()))

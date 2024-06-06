@@ -18,21 +18,22 @@ func main(){
         ListenAddr: ":4000",
         HandshakeFunc: p2p.NOPHandshakeFunc,
         Decoder: &p2p.DefaultDecoder{},
-        OnPeer: OnPeer,
+        // To-Do
+        // onpeer func
     }
-    tr := p2p.NewTCPTransport(tcpOpts)
-    
-    go func () {
-        ch := tr.Consume()
-        for msg := range ch {
-            fmt.Printf("Message: %+v\n", msg)
-        }
-    }()
+    tcpTransport := p2p.NewTCPTransport(tcpOpts)
 
-    if err := tr.ListenAndAccept(); err != nil {
+    fileServerOpts := FileServerOpts{
+       StorageRoot: "4000_network",
+       Transport: tcpTransport,
+       PathTransformFunc: CASPathTransformFunc,
+    }
+
+    fs := NewFileServer(fileServerOpts)
+    if err := fs.Start(); err != nil {
         log.Fatal(err)
     }
-    fmt.Println("Listening...")
+
     select {}
 }
 

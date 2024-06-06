@@ -22,7 +22,7 @@ func TestPathTransformFunc(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-    store := newStore(t)
+    store := newStore()
     defer teardown(t, store)
 
     for i:=0; i < 50; i++ {
@@ -60,16 +60,12 @@ func TestStore(t *testing.T) {
     }
 }
 
-func newStore(t *testing.T) *Store {
+func newStore() *Store {
     opts := StoreOpts{
         Root: fmt.Sprintf("./storage/%d", time.Now().UnixMilli()),
         PathTransformFunc: CASPathTransformFunc,        
     }
-    store, err := NewStore(opts)
-    if err != nil {
-        t.Error(err)
-    }
-    return store
+    return NewStore(opts)
 }
 
 func teardown(t *testing.T, s *Store) {

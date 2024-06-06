@@ -59,13 +59,13 @@ type Store struct {
     StoreOpts
 }
 
-func NewStore(opts StoreOpts) (*Store, error) {
+func NewStore(opts StoreOpts) *Store {
     if opts.PathTransformFunc == nil {
         opts.PathTransformFunc = DefaultPathTranformFunc
     }
     return &Store{
         StoreOpts: opts,
-    }, nil
+    }
 }
 
 func (s *Store) getAbsolutePath(path string) string {

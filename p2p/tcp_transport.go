@@ -1,41 +1,41 @@
 package p2p
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 )
 
+
 // TCPPeer represent the remote node over a TCP established connection
 type TCPPeer struct {
-    // conn is the underlying connection of the peer
-    conn net.Conn
+    net.Conn
 
     // if we initiate the connection ==> outbound == false
     // if we accept and retrieve a connection ==> outbound == true
     outbound bool
 }
 
-// RemoteAddr implements peer interface and will return the
-// remote address of its underlying connection
-func (peer *TCPPeer) RemoteAddr() net.Addr {
-    return peer.conn.RemoteAddr()
-}
-
-// Close implements the peer interface
-func (peer *TCPPeer) Close() error {
-    return peer.conn.Close()
-}
-
+// Write function takes bytes slice and first send the content length of those bytes to peer and then stream the bytes
 func (peer *TCPPeer) Send(b []byte) error {
-    _, err := peer.conn.Write(b)
+    contentLength := uint64(len(b))
+    contentLengthBytes := make([]byte, 8)
+    binary.BigEndian.PutUint64(contentLengthBytes, contentLength)
+
+    _, err := peer.Conn.Write(contentLengthBytes)
+    if err != nil {
+        return err
+    }
+
+    _, err = peer.Conn.Write(b)
     return err
 }
 
 func NewTCPPeer(conn net.Conn, outboud bool) *TCPPeer {
     return &TCPPeer{
-        conn: conn,
+        Conn: conn,
         outbound: outboud,
     }
 }
@@ -136,7 +136,7 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
     }
 
     // Read loop
-    rpc := RPC{From: conn.RemoteAddr()}
+    rpc := RPC{From: conn.RemoteAddr().String()}
     for {
         // To-Do -  
         // figure out a way to identify the error type

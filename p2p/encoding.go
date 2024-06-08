@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"encoding/gob"
+	"encoding/binary"
 	"io"
 )
 
@@ -9,27 +9,43 @@ type Decoder interface {
     Decode(io.Reader, *RPC) error
 }
 
-type GOBDecoder struct {
-}
-
-func (dec *GOBDecoder) Decode(r io.Reader, msg *RPC) error{
-    return gob.NewDecoder(r).Decode(msg)
-}
-
 type DefaultDecoder struct {
 }
 
 func (dec *DefaultDecoder) Decode(r io.Reader, msg *RPC) error{
-    buf := make([]byte, 1028)
+    // Get content length
+    // then collect streaming data of that content length
 
-    n, err := r.Read(buf)
-
+    contentLengthBytes := make([]byte, 8)
+    n, err := r.Read(contentLengthBytes)
     if err != nil {
         return err
     }
-    
-    msg.Payload = buf[:n]
+    contentLength := int(binary.BigEndian.Uint64(contentLengthBytes[:n]))
 
+    for {
+        buf := make([]byte, 1)
+        n, err := r.Read(buf)
+        if err != nil {
+            return err
+        }
+
+        remainingLength := contentLength - len(msg.Payload)
+        var payload []byte
+        if n > remainingLength {
+            payload = buf[:remainingLength]
+        } else {
+            payload = buf[:n]
+        }
+
+        for _, b := range payload {
+            msg.Payload = append(msg.Payload, b)
+        }
+
+        if contentLength == len(msg.Payload) {
+            break
+        }
+    }
     return nil
 }
 

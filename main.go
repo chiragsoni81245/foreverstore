@@ -24,6 +24,7 @@ func makeserver(listenAddr string, nodes ...string) *FileServer {
        Transport: tcpTransport,
        PathTransformFunc: CASPathTransformFunc,
        BootstrapNodes: nodes,
+       EncryptionKey: []byte("rptreftgrtgfrefrdeswfrdefrdejtkg"),
     }
     fs := NewFileServer(fileServerOpts)
     tcpTransport.OnPeer = fs.OnPeer

@@ -31,6 +31,7 @@ type FileServerOpts struct {
     PathTransformFunc PathTransformFunc
     Transport p2p.Transport
     BootstrapNodes []string
+    EncryptionKey []byte
 }
 
 type FileServer struct {
@@ -204,9 +205,9 @@ func (fs *FileServer) broadcast(msg *Message, r io.Reader) error {
     return nil
 }
 
-func (fs *FileServer) Get(key string) (io.Reader, int64, error) {
+func (fs *FileServer) Get(key string) (f io.Reader, size int64, err error) {
     if fs.store.Has(key) {
-        return fs.store.Read(key)
+        f, size, err = fs.store.Read(key)
     } else {
         // Local store does not have file associated with key
         // Checking on network peers
@@ -247,25 +248,40 @@ func (fs *FileServer) Get(key string) (io.Reader, int64, error) {
                 peer.CloseStream()
                 continue
             } else {
-                _, err := fs.store.Write(key, io.LimitReader(peer, fileSize)) 
+                _, err = fs.store.Write(key, io.LimitReader(peer, fileSize)) 
                 if err != nil {
                     return nil, 0, err
                 }
                 peer.CloseStream()
-                return fs.store.Read(key) 
+
+                f, size, err = fs.store.Read(key)
+                if err != nil {
+                    return nil, 0, err
+                }
+                break
             }
         }
+    }
 
+    if f == nil {
         return nil, 0, fmt.Errorf("file not found")
     }
+
+    decryptedBuf := new(bytes.Buffer)
+    decryptedBufSize, err := p2p.CopyDecrypt(fs.EncryptionKey, decryptedBuf, f)
+    return decryptedBuf, int64(decryptedBufSize), err
 }
 
 func (fs *FileServer) Store(key string, r io.Reader) error{
-    // 1. Store this file to disk
-    // 2. Broadcast this file to the peer network
+    // 1. Wrap the file reader in p2p.CopyEncrypt function
+    // 1. Store this encrypted file to disk
+    // 2. Broadcast this encrypted file to the peer network
     
+    encryptedBuf := new(bytes.Buffer)
+    p2p.CopyEncrypt(fs.EncryptionKey, encryptedBuf, r)
+
     buf := new(bytes.Buffer)
-    tee := io.TeeReader(r, buf)
+    tee := io.TeeReader(encryptedBuf, buf)
 
     size, err := fs.store.Write(key, tee); 
     if err != nil {

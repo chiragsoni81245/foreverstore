@@ -244,12 +244,14 @@ func (fs *FileServer) Get(key string) (io.Reader, int64, error) {
 
             if fileSize == 0 {
                 log.Printf("file does not exists on peer (%s)", peer.LocalAddr().String())
+                peer.CloseStream()
                 continue
             } else {
                 _, err := fs.store.Write(key, io.LimitReader(peer, fileSize)) 
                 if err != nil {
                     return nil, 0, err
                 }
+                peer.CloseStream()
                 return fs.store.Read(key) 
             }
         }

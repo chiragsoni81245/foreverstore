@@ -4,39 +4,64 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"sync"
 )
-
 
 // TCPPeer represent the remote node over a TCP established connection
 type TCPPeer struct {
     net.Conn
+
+    // streamWg is to pause read loop so that we can read streams separately
+    streamWg *sync.WaitGroup
 
     // if we initiate the connection ==> outbound == false
     // if we accept and retrieve a connection ==> outbound == true
     outbound bool
 }
 
-// Write function takes bytes slice and first send the content length of those bytes to peer and then stream the bytes
-func (peer *TCPPeer) Send(b []byte) error {
-    contentLength := uint64(len(b))
-    contentLengthBytes := make([]byte, 8)
-    binary.BigEndian.PutUint64(contentLengthBytes, contentLength)
-
-    _, err := peer.Conn.Write(contentLengthBytes)
+// Write function takes type byte, io.Reader and that reader's size first send the byte type 
+// so remote peer will be ready for steam or normal message based on this type 
+// if t == IncomingMessage --> then content length will be transferred and then the actual message bytes will be sent
+// if t == IncomingStream --> then directly the stream bytes will be sent
+func (peer *TCPPeer) Send(t byte, r io.Reader, size int64) error {
+    // Send incoming data type to remote peer
+    _, err := peer.Conn.Write([]byte{t})
     if err != nil {
         return err
     }
 
-    _, err = peer.Conn.Write(b)
-    return err
+    if r == nil || size == 0 { return nil }
+
+    if t == IncomingMessage {
+        err := binary.Write(peer, binary.LittleEndian, size)
+        if err != nil {
+            return err
+        }
+    }
+    
+    // Send message or stream bytes to remote peer
+    _, err = io.Copy(peer, r)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+// CloseStream function implements Peer interface
+// it is used to continue the read loop of messages after reading the stream of previous message from peer connection reader
+func (peer *TCPPeer) CloseStream() {
+    peer.streamWg.Done()
 }
 
 func NewTCPPeer(conn net.Conn, outboud bool) *TCPPeer {
     return &TCPPeer{
         Conn: conn,
         outbound: outboud,
+        streamWg: &sync.WaitGroup{},
     }
 }
 
@@ -136,14 +161,22 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
     }
 
     // Read loop
-    rpc := RPC{From: conn.RemoteAddr().String()}
     for {
+        rpc := RPC{}
         // To-Do -  
         // figure out a way to identify the error type
         // so we can break the read loop only for case 
         // when a connection is already closed while reading from it
         if err = t.Decoder.Decode(conn, &rpc); err != nil { 
             return 
+        }
+
+        rpc.From = conn.RemoteAddr().String()
+
+        if rpc.Stream {
+            peer.streamWg.Add(1)
+            peer.streamWg.Wait()
+            continue
         }
 
         t.rpcch <- rpc 

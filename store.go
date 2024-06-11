@@ -110,10 +110,10 @@ func (s *Store) Delete(key string) error {
     return nil
 }
 
-func (s *Store) Read(key string) (io.Reader, error) {
-    f, err := s.readStream(key)
+func (s *Store) Read(key string) (io.Reader, int64, error) {
+    f, fi, err := s.readStream(key)
     if err != nil {
-        return nil, err
+        return nil, 0, err
     }
     defer func(){
         f.Close()
@@ -126,40 +126,47 @@ func (s *Store) Read(key string) (io.Reader, error) {
     buf := new(bytes.Buffer)
     _, err = io.Copy(buf, f)
     if err != nil {
-        return nil, err
+        return nil, 0, err
     }
 
-    return buf, nil
+    return buf, (*fi).Size(), nil
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
+func (s *Store) Write(key string, r io.Reader) (size int64, err error) {
     return s.writeStream(key, r)
 }
 
-func (s *Store) readStream(key string) (*os.File, error) {
+func (s *Store) readStream(key string) (*os.File, *os.FileInfo, error) {
     pathKey := s.PathTransformFunc(key)
-    return os.Open(s.getAbsolutePath(pathKey.GetFilePath()))
+    filepath := s.getAbsolutePath(pathKey.GetFilePath())
+    fi, err := os.Stat(filepath)
+    if err != nil {
+        return nil, nil, err
+    }
+    f, err := os.Open(filepath)
+
+    return f, &fi, err
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
     pathKey := s.PathTransformFunc(key) 
 
     if err := os.MkdirAll(s.getAbsolutePath(pathKey.Path), os.ModePerm); err != nil {
-        return err
+        return 0, err
     }
 
     filepath := s.getAbsolutePath(pathKey.GetFilePath())
     f, err := os.Create(filepath)
     if err != nil {
-        return err
+        return 0, err
     }
 
     n, err := io.Copy(f, r)
     if err != nil {
-        return err
+        return 0, err
     }
     
     log.Printf("written (%d) bytes to disk: %s", n, filepath)
 
-    return nil
+    return n, nil
 }

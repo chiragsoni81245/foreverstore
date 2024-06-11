@@ -3,17 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
 	"github.com/chiragsoni81245/foreverstore/p2p"
 )
 
-func OnPeer(peer p2p.Peer) error {
-    fmt.Println("Got the peer, doing something with it outside of tcp transport...")
-    peer.Close()
-    return nil
-}
 
 func makeserver(listenAddr string, nodes ...string) *FileServer {
     tcpOpts := p2p.TCPTransportOpts{
@@ -44,10 +40,27 @@ func main(){
     fs2.Start()
     time.Sleep(1*time.Second)
     
-    data := bytes.NewReader([]byte("my big data file!"))
-    if err := fs2.StoreFile("myprivatedata", data); err != nil {
+    key := "myprivatedata"
+    data := []byte("my big data file yo hoooo --")
+    dataReader := bytes.NewReader(data)
+    if err := fs2.Store(key, dataReader); err != nil {
         log.Fatal(err)
     }
+
+    time.Sleep(1*time.Second)
+    fs2.store.Delete(key)
+
+    r, _, err := fs2.Get(key)
+    if err != nil {
+        log.Fatal(err)
+    }
+    receivedData := new(bytes.Buffer)
+    n, err := io.Copy(receivedData, r)
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("Received Data (%d bytes): '%s'", n, string(receivedData.Bytes()))
+
     select {}
 }
 

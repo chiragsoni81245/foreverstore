@@ -20,7 +20,7 @@ func makeserver(listenAddr string, nodes ...string) *FileServer {
     tcpTransport := p2p.NewTCPTransport(tcpOpts)
 
     fileServerOpts := FileServerOpts{
-       StorageRoot: fmt.Sprintf("%s_network", listenAddr),
+       StorageRoot: fmt.Sprintf("storage/%s_network", listenAddr),
        Transport: tcpTransport,
        PathTransformFunc: CASPathTransformFunc,
        BootstrapNodes: nodes,

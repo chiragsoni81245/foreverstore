@@ -51,6 +51,12 @@ func (peer *TCPPeer) Send(t byte, r io.Reader, size int64) error {
     return nil
 }
 
+func (peer *TCPPeer) Write(b []byte) (n int, err error) {
+    // To-Do
+    // apply encryption on these bytes
+    return peer.Conn.Write(b)
+}
+
 // CloseStream function implements Peer interface
 // it is used to continue the read loop of messages after reading the stream of previous message from peer connection reader
 func (peer *TCPPeer) CloseStream() {

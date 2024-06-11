@@ -28,7 +28,7 @@ func TestStore(t *testing.T) {
     for i:=0; i < 50; i++ {
         key := fmt.Sprintf("foo_%d", i)
         data := []byte("some random bytes")
-        if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
+        if _, err := store.writeStream(key, bytes.NewReader(data)); err != nil {
             t.Error(err)
         }
 
@@ -36,7 +36,7 @@ func TestStore(t *testing.T) {
             t.Errorf("expected to have key %s", key)
         }
 
-        r, err := store.Read(key)
+        r, _, err := store.Read(key)
         if err != nil {
             t.Error(err)
         }

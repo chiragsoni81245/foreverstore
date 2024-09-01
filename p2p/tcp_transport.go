@@ -7,15 +7,14 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
 )
 
 // TCPPeer represent the remote node over a TCP established connection
 type TCPPeer struct {
     net.Conn
 
-    // streamWg is to pause read loop so that we can read streams separately
-    streamWg *sync.WaitGroup
+    // streamTriggerCh is to send the events when a stream start and stops
+    streamTriggerCh chan struct{}
 
     // if we initiate the connection ==> outbound == false
     // if we accept and retrieve a connection ==> outbound == true
@@ -57,17 +56,24 @@ func (peer *TCPPeer) Write(b []byte) (n int, err error) {
     return peer.Conn.Write(b)
 }
 
+// ReadStream function implements Peer interface
+// it will be used when user want to use a specific size of stream
+func (peer *TCPPeer) ReadStream(size int64) io.Reader {
+    <- peer.streamTriggerCh
+    return io.LimitReader(peer, size) 
+}
+
 // CloseStream function implements Peer interface
 // it is used to continue the read loop of messages after reading the stream of previous message from peer connection reader
 func (peer *TCPPeer) CloseStream() {
-    peer.streamWg.Done()
+    peer.streamTriggerCh <- struct{}{} 
 }
 
 func NewTCPPeer(conn net.Conn, outboud bool) *TCPPeer {
     return &TCPPeer{
         Conn: conn,
         outbound: outboud,
-        streamWg: &sync.WaitGroup{},
+        streamTriggerCh: make(chan struct{}),
     }
 }
 
@@ -180,8 +186,8 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
         rpc.From = conn.RemoteAddr().String()
 
         if rpc.Stream {
-            peer.streamWg.Add(1)
-            peer.streamWg.Wait()
+            peer.streamTriggerCh <- struct{}{} // Send the trigger which will result in stream start
+            <- peer.streamTriggerCh // Wait for the trigger which will result in stream stop
             continue
         }
 

@@ -132,7 +132,7 @@ func (fs *FileServer) handleStoreFileMessage(rpc *p2p.RPC, msgPayload *MessageSt
         return err
     }
 
-    if _, err := fs.store.Write(msgPayload.Key, io.LimitReader(peer, msgPayload.Size)); err != nil {
+    if _, err := fs.store.Write(msgPayload.Key, peer.ReadStream(msgPayload.Size)); err != nil {
         return err
     }
 
@@ -232,11 +232,6 @@ func (fs *FileServer) Get(key string) (f io.Reader, size int64, err error) {
                 log.Printf("error in sending message to peer %s", peer.RemoteAddr().String())
             }
             
-            // To-Do
-            // Try to find a way to check if the peer is in streaming mode or not if not then wait for the stream
-            // because if the read loop is not paused so there can be two readers reading from peer at the same time causing a race condition
-            // for now using time.Sleep to mimic the wait
-
             var fileSize int64
             err = binary.Read(peer, binary.LittleEndian, &fileSize)
             if err != nil {
@@ -248,7 +243,7 @@ func (fs *FileServer) Get(key string) (f io.Reader, size int64, err error) {
                 peer.CloseStream()
                 continue
             } else {
-                _, err = fs.store.Write(key, io.LimitReader(peer, fileSize)) 
+                _, err = fs.store.Write(key, peer.ReadStream(fileSize)) 
                 if err != nil {
                     return nil, 0, err
                 }

@@ -10,6 +10,7 @@ type Peer interface {
     net.Conn
     Send(t byte, r io.Reader, size int64) error
     CloseStream()
+    ReadStream(size int64) io.Reader
 }
 
 // Transport is anything that handles the communication

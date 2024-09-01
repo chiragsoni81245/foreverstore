@@ -14,7 +14,7 @@ import (
 func makeserver(listenAddr string, nodes ...string) *FileServer {
     tcpOpts := p2p.TCPTransportOpts{
         ListenAddr: listenAddr,
-        HandshakeFunc: p2p.NOPHandshakeFunc,
+        HandshakeFunc: p2p.DiffieHallmanHandshake,
         Decoder: &p2p.DefaultDecoder{},
     }
     tcpTransport := p2p.NewTCPTransport(tcpOpts)

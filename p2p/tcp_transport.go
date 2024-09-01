@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -16,6 +17,9 @@ type TCPPeer struct {
     // streamTriggerCh is to send the events when a stream start and stops
     streamTriggerCh chan struct{}
 
+    // secretKey will be the key to used in encryption and decryption of traffic 
+    secretKey []byte
+
     // if we initiate the connection ==> outbound == false
     // if we accept and retrieve a connection ==> outbound == true
     outbound bool
@@ -27,7 +31,7 @@ type TCPPeer struct {
 // if t == IncomingStream --> then directly the stream bytes will be sent
 func (peer *TCPPeer) Send(t byte, r io.Reader, size int64) error {
     // Send incoming data type to remote peer
-    _, err := peer.Conn.Write([]byte{t})
+    _, err := peer.Write([]byte{t})
     if err != nil {
         return err
     }
@@ -51,9 +55,36 @@ func (peer *TCPPeer) Send(t byte, r io.Reader, size int64) error {
 }
 
 func (peer *TCPPeer) Write(b []byte) (n int, err error) {
-    // To-Do
-    // apply encryption on these bytes
-    return peer.Conn.Write(b)
+    cb := new(bytes.Buffer)
+    n, err = CopyEncrypt(peer.secretKey, cb, bytes.NewReader(b))
+    if(err != nil) {
+        return 0, err
+    }
+
+    _, err = peer.Conn.Write(cb.Bytes())
+    if(err != nil) {
+        return 0, err
+    }
+    
+    return len(b), nil
+}
+
+func (peer *TCPPeer) Read(b []byte) (n int, err error) {
+    buf := new(bytes.Buffer) 
+    cb := make([]byte, cap(b)+16) // Here 16 is the IV size which will be appended in all ciphers
+
+    n, err = peer.Conn.Read(cb)
+    if(err != nil) {
+        return 0, err
+    }
+
+    n, err = CopyDecrypt(peer.secretKey, buf, bytes.NewReader(cb[:n]))
+    if(err != nil) {
+        return 0, err
+    }
+    copy(b, buf.Bytes())
+
+    return buf.Len(), nil
 }
 
 // ReadStream function implements Peer interface
@@ -162,7 +193,11 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
 
     peer := NewTCPPeer(conn, outbound)
 
-    if err = t.HandshakeFunc(peer); err != nil {
+    secretKey, err := t.HandshakeFunc(conn)
+    peer.secretKey = secretKey
+    
+
+    if err != nil {
         return
     }
 
@@ -179,7 +214,7 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
         // figure out a way to identify the error type
         // so we can break the read loop only for case 
         // when a connection is already closed while reading from it
-        if err = t.Decoder.Decode(conn, &rpc); err != nil { 
+        if err = t.Decoder.Decode(peer, &rpc); err != nil { 
             return 
         }
 
@@ -193,4 +228,5 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
 
         t.rpcch <- rpc 
     }
+
 }

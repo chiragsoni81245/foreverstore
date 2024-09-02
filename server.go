@@ -263,7 +263,7 @@ func (fs *FileServer) Get(key string) (f io.Reader, size int64, err error) {
     }
 
     decryptedBuf := new(bytes.Buffer)
-    decryptedBufSize, err := p2p.CopyDecrypt(fs.EncryptionKey, decryptedBuf, f)
+    decryptedBufSize, err := p2p.CopyDecrypt(fs.EncryptionKey, decryptedBuf, f, nil)
     return decryptedBuf, int64(decryptedBufSize), err
 }
 
@@ -273,7 +273,7 @@ func (fs *FileServer) Store(key string, r io.Reader) error{
     // 2. Broadcast this encrypted file to the peer network
     
     encryptedBuf := new(bytes.Buffer)
-    p2p.CopyEncrypt(fs.EncryptionKey, encryptedBuf, r)
+    p2p.CopyEncrypt(fs.EncryptionKey, encryptedBuf, r, nil)
 
     buf := new(bytes.Buffer)
     tee := io.TeeReader(encryptedBuf, buf)

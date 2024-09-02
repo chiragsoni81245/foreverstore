@@ -18,6 +18,8 @@ type TCPPeer struct {
     streamTriggerCh chan struct{}
 
     // secretKey will be the key to used in encryption and decryption of traffic 
+    iv []byte
+    peerIV []byte
     secretKey []byte
 
     // if we initiate the connection ==> outbound == false
@@ -56,7 +58,7 @@ func (peer *TCPPeer) Send(t byte, r io.Reader, size int64) error {
 
 func (peer *TCPPeer) Write(b []byte) (n int, err error) {
     cb := new(bytes.Buffer)
-    n, err = CopyEncrypt(peer.secretKey, cb, bytes.NewReader(b))
+    n, err = CopyEncrypt(peer.secretKey, cb, bytes.NewReader(b), peer.iv)
     if(err != nil) {
         return 0, err
     }
@@ -71,14 +73,14 @@ func (peer *TCPPeer) Write(b []byte) (n int, err error) {
 
 func (peer *TCPPeer) Read(b []byte) (n int, err error) {
     buf := new(bytes.Buffer) 
-    cb := make([]byte, cap(b)+16) // Here 16 is the IV size which will be appended in all ciphers
+    cb := make([]byte, cap(b)) 
 
     n, err = peer.Conn.Read(cb)
     if(err != nil) {
         return 0, err
     }
 
-    n, err = CopyDecrypt(peer.secretKey, buf, bytes.NewReader(cb[:n]))
+    n, err = CopyDecrypt(peer.secretKey, buf, bytes.NewReader(cb[:n]), peer.peerIV)
     if(err != nil) {
         return 0, err
     }
@@ -193,9 +195,10 @@ func (t *TCPTrasport) handleConn(conn net.Conn, outbound bool) {
 
     peer := NewTCPPeer(conn, outbound)
 
-    secretKey, err := t.HandshakeFunc(conn)
+    secretKey, iv, peerIV, err := t.HandshakeFunc(conn)
     peer.secretKey = secretKey
-    
+    peer.peerIV = peerIV
+    peer.iv = iv 
 
     if err != nil {
         return

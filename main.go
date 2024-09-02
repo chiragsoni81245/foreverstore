@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"github.com/chiragsoni81245/foreverstore/p2p"
@@ -42,11 +42,11 @@ func main(){
     time.Sleep(1*time.Second)
     
     key := "myprivatedata"
-    data := []byte("my big data file yo hoooo --")
-    dataReader := bytes.NewReader(data)
-    if err := fs2.Store(key, dataReader); err != nil {
+    f, err := os.Open("test_file")
+    if err := fs2.Store(key, f); err != nil {
         log.Fatal(err)
     }
+    f.Close()
 
     time.Sleep(1*time.Second)
     fs2.store.Delete(key)
@@ -55,12 +55,15 @@ func main(){
     if err != nil {
         log.Fatal(err)
     }
-    receivedData := new(bytes.Buffer)
-    n, err := io.Copy(receivedData, r)
+
+    f, err = os.Create("output_file")
+    n, err := io.Copy(f, r)
     if err != nil {
         log.Fatal(err)
     }
-    log.Printf("Received Data (%d bytes): '%s'", n, string(receivedData.Bytes()))
+    f.Close()
+    
+    log.Printf("Received %d bytes", n)
 
     select {}
 }
